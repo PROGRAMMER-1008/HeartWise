@@ -1,0 +1,30 @@
+{
+  "artifact_id": "hw-8f3c351bc5ead288",
+  "environment": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.13",
+  "workload": "Synthetic A; 20 sequential requests per mode, 12 requests/4 concurrent workers; lock serializes estimator use",
+  "cold_process_to_prediction_seconds": 2.439051399938762,
+  "bundle_load_seconds": 0.07263339997734874,
+  "latency": {
+    "prediction_only": {
+      "n": 20,
+      "p50_ms": 3.362750052474439,
+      "p95_ms": 3.7348049925640225
+    },
+    "with_explanation": {
+      "n": 20,
+      "p50_ms": 7.886399980634451,
+      "p95_ms": 8.625060034682974
+    },
+    "concurrent_4_workers": {
+      "n": 12,
+      "p50_ms": 31.98929998325184,
+      "p95_ms": 32.93609500979073
+    }
+  },
+  "memory": {
+    "working_set_mb": 160.1953125,
+    "peak_working_set_mb": 160.3046875
+  },
+  "targets": "Local demo target: startup <5s; warm explained p95 <500ms, 4-worker p95 <2s. Baseline targets, not SLAs."
+}

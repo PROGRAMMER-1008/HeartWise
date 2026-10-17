@@ -1,0 +1,34 @@
+{
+  "study_path": "artifacts\\studies\\imputation-44a5e51767b11cd3",
+  "metrics": {
+    "complete_case": {
+      "n": 236,
+      "tn": 114,
+      "fp": 14,
+      "fn": 22,
+      "tp": 86,
+      "accuracy": 0.847457627118644,
+      "precision": 0.86,
+      "sensitivity": 0.7962962962962963,
+      "specificity": 0.890625,
+      "roc_auc": 0.9046585648148149,
+      "average_precision": 0.9023025081063537,
+      "brier": 0.11726749506222042
+    },
+    "fold_imputation": {
+      "n": 236,
+      "tn": 115,
+      "fp": 13,
+      "fn": 22,
+      "tp": 86,
+      "accuracy": 0.8516949152542372,
+      "precision": 0.8686868686868687,
+      "sensitivity": 0.7962962962962963,
+      "specificity": 0.8984375,
+      "roc_auc": 0.9069733796296297,
+      "average_precision": 0.9038792940221878,
+      "brier": 0.11738708342615856
+    }
+  },
+  "limitation": "Diagnostic only, on development data already used for selection; not a new unbiased estimate. Evaluation excludes incomplete validation records, so this does not validate scoring missing specialist inputs. Deployed model and complete-input policy remain unchanged."
+}

@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "artifact_id": "hw-8f3c351bc5ead288",
+  "fingerprint": "8f3c351bc5ead288f54312392ba421168060fe9d7b00a5c07747030cf3dd4cc9",
+  "dataset_hash": "e31e52eb5ee890c1a11a3baef3df95e8174718d5b94b0a8b77665ec3c07328ff",
+  "split_hash": "8762e005ef937e610c0aa6c0d1a3fde2236e4c26c8dc10a9bb4ff060619367f2",
+  "created_utc": "2026-10-11T23:20:44.625249+00:00",
+  "python": "3.12.13",
+  "dependencies": {
+    "scikit-learn": "1.8.0",
+    "numpy": "2.4.4",
+    "pandas": "3.0.2",
+    "joblib": "1.5.3",
+    "xgboost": "3.4.1"
+  },
+  "code_revision": null,
+  "config": {
+    "seed": 42,
+    "test_fraction": 0.2,
+    "inner_folds": 3,
+    "selection_folds": 5,
+    "outer_folds": 3,
+    "calibration": [
+      "none",
+      "sigmoid"
+    ],
+    "calibration_ensemble": false,
+    "threshold": 0.5,
+    "monotonic_policy": "none; correlations are not sufficient justification",
+    "missing_policy": "complete cases; imputation comparison deferred to a separately versioned study",
+    "code_sha256": "9dc7ad7d5c151aa3e3da0af2c8c38773c826c997c754b3affd6bf1e8b6258a93"
+  },
+  "classes": [
+    0,
+    1
+  ],
+  "threshold": 0.5,
+  "calibration": "sigmoid",
+  "selected": "Logistic C=0.1",
+  "selection_rule": "Lowest development OOF Brier; then highest ROC-AUC; then lexical identity. No final-test selection.",
+  "metrics": {
+    "n": 60,
+    "tn": 29,
+    "fp": 3,
+    "fn": 7,
+    "tp": 21,
+    "accuracy": 0.8333333333333334,
+    "precision": 0.875,
+    "sensitivity": 0.75,
+    "specificity": 0.90625,
+    "roc_auc": 0.9609375,
+    "average_precision": 0.9533702183367796,
+    "brier": 0.08564720545463497
+  },
+  "uncertainty": {
+    "method": "95% percentile bootstrap, fixed fitted model; not training/selection uncertainty",
+    "seed": 42,
+    "resamples": 500,
+    "limits": {
+      "accuracy": [
+        0.7333333333333333,
+        0.9166666666666666
+      ],
+      "sensitivity": [
+        0.5925925925925926,
+        0.8947967980295566
+      ],
+      "specificity": [
+        0.8055555555555556,
+        1.0
+      ],
+      "roc_auc": [
+        0.9076739618406285,
+        0.994429419344907
+      ],
+      "brier": [
+        0.04990525694089466,
+        0.12579525532504945
+      ]
+    }
+  },
+  "training_support": {
+    "age": [
+      34.0,
+      77.0
+    ],
+    "trestbps": [
+      94.0,
+      200.0
+    ],
+    "chol": [
+      126.0,
+      564.0
+    ],
+    "thalach": [
+      71.0,
+      194.0
+    ],
+    "oldpeak": [
+      0.0,
+      6.2
+    ],
+    "ca": [
+      0.0,
+      3.0
+    ]
+  },
+  "checksums": {
+    "background.csv": "0d0c9c3f29b569910f555bc5b02a9d1b36a1d7ad14f5d48d0f8461cbc31c7e91",
+    "calibration.png": "48b0f94051a0f5d067f090d48105f597e4d471ab14dff08e215af2386166a7e5",
+    "candidates.csv": "b7aa0ab51f4ebe96983351f38f9e84b11bbcc576eca359f63e8d52bcf25832c3",
+    "confusion.png": "2cfa8c5883424a8335af93deadaa68f7cc8f6c08572af320faf0dbad755b2be5",
+    "model.joblib": "c54bf5361d27719b29040d60869d40981a1854aa58067451d5ccd02d6fad8195",
+    "nested_cv.json": "0bbf9e200a24e18beef76bec460408ae3b6c47d768695af0719b92618acc2064",
+    "pr.png": "ecb865673fadeaaae96298363409a7046e2010955a1c576e2c3cb221e27983a8",
+    "reliability.csv": "4700953b3582a0e7f70f26a022047aba82d426d9f13ab3aee8a40e138e74ec46",
+    "roc.png": "dc9ea594e297f887d0f369857705a115521915ab6e62b913dd059779857a0b48",
+    "splits.csv": "8762e005ef937e610c0aa6c0d1a3fde2236e4c26c8dc10a9bb4ff060619367f2",
+    "subgroups.json": "21841b959970a69da0224dff6e667cd2bd96ada20c9c5ce0232562fcf42fc892",
+    "test_predictions.csv": "818beca9141929524d47c571b58f7e1756f6c4d431a96edc5e93ce455cc25503",
+    "thresholds.csv": "e5672aa44141f4d4e300350eb9f0810adf9f74c242a0c254b6fdc11511b0820c",
+    "validation_predictions.csv": "56cf7cd27c8696eeeb3a045b96641c14500e2c84eb59373e6bb2b382b3b8c12b"
+  },
+  "figures": {
+    "Confusion matrix": "confusion.png",
+    "ROC": "roc.png",
+    "Precision-recall": "pr.png",
+    "Reliability": "calibration.png"
+  },
+  "data_quality": {
+    "raw_rows": 303,
+    "clean_rows": 296,
+    "removed_rows": 7,
+    "removed_distinct_rows": 6,
+    "matches": 303,
+    "distinct_source_matches": 302
+  },
+  "evaluation_scope": "Internal retrospective evaluation on already inspected Cleveland data; not external or clinical validation."
+}

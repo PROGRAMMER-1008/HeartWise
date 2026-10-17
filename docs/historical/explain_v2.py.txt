@@ -1,0 +1,150 @@
+"""
+explain.py
+----------
+Turns one patient's prediction into a short, human-readable list of "why":
+the factors that pushed their risk up or down the most, in plain language.
+
+Both the FastAPI service and the Streamlit app import `HeartRiskExplainer`
+from here so there is exactly one implementation of "how do we explain a
+prediction" — not one copy in the API and a slightly different one in the UI.
+"""
+
+import sys
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+import shap
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from data_pipeline import (  # noqa: E402
+    ALL_FEATURES,
+    get_feature_names_out,
+    prettify_feature_name,
+)
+
+ROOT = Path(__file__).resolve().parent.parent
+MODELS_DIR = ROOT / "models"
+
+
+class HeartRiskExplainer:
+    """Loads the trained pipeline + a base (uncalibrated) tree model once,
+    then answers repeated single-patient prediction + explanation requests
+    cheaply. TreeExplainer is fast enough to run per-request; this avoids
+    the far slower KernelExplainer path that a non-tree model would need."""
+
+    def __init__(self):
+        self.calibrated_model = joblib.load(MODELS_DIR / "heart_model_pipeline.joblib")
+        self.base_pipe = joblib.load(MODELS_DIR / "heart_model_base_uncalibrated.joblib")
+        self.preprocessor = self.base_pipe.named_steps["preprocessor"]
+        self.classifier = self.base_pipe.named_steps["classifier"]
+        self.feature_names_raw = get_feature_names_out(self.preprocessor)
+
+        self._shap_explainer = None
+        if hasattr(self.classifier, "feature_importances_") or "Tree" in type(self.classifier).__name__:
+            try:
+                self._shap_explainer = shap.TreeExplainer(self.classifier)
+            except Exception:
+                self._shap_explainer = None
+
+    def predict(self, patient: dict) -> dict:
+        """patient: dict of raw feature values (age, sex, cp, ... as in
+        data_pipeline.ALL_FEATURES). Returns model output + top factors."""
+        row = pd.DataFrame([{col: patient[col] for col in ALL_FEATURES}])
+
+        probability = float(self.calibrated_model.predict_proba(row)[0, 1])
+        prediction = int(probability >= 0.5)
+        risk_level = self._risk_level(probability)
+
+        top_factors = self._top_factors(row)
+
+        return {
+            "prediction": prediction,
+            "prediction_label": "Elevated Risk" if prediction == 1 else "Lower Risk",
+            "probability": round(probability, 4),
+            "risk_level": risk_level,
+            "top_factors": top_factors,
+        }
+
+    @staticmethod
+    def _risk_level(probability: float) -> str:
+        # Three simple bands rather than a bare 0/1 — softer, more honest
+        # framing than a binary yes/no for a screening tool.
+        if probability < 0.35:
+            return "Low"
+        if probability < 0.65:
+            return "Borderline"
+        return "Elevated"
+
+    def _top_factors(self, row: pd.DataFrame, top_n: int = 5) -> list:
+        transformed = self.preprocessor.transform(row)
+        if hasattr(transformed, "toarray"):
+            transformed = transformed.toarray()
+
+        if self._shap_explainer is not None:
+            sv = self._shap_explainer.shap_values(transformed)
+            if isinstance(sv, list):
+                sv = sv[1]
+            elif isinstance(sv, np.ndarray) and sv.ndim == 3:
+                sv = sv[:, :, 1]
+            values = sv[0]
+            raw_values = transformed[0]
+        else:
+            # Fallback for non-tree models: no exact per-patient attribution
+            # available cheaply, so fall back to global importance direction
+            # is not meaningful — return empty and let the caller show the
+            # global feature-importance chart instead.
+            return []
+
+        # For one-hot encoded categorical columns, SHAP still assigns a
+        # (non-zero) attribution to every dummy column, including the ones
+        # that are 0 for this patient — e.g. a patient with
+        # Thalassemia = Reversible defect will *also* get a nonzero SHAP
+        # value on the "Thalassemia = Normal" column (attributing what
+        # would have happened had they NOT had that category). Left in,
+        # this makes the same categorical feature appear twice — sometimes
+        # with contradictory-looking directions — in the top-factors list.
+        # We only want the one dummy that's actually TRUE for this patient,
+        # so any "cat__" column sitting at 0 is excluded before ranking.
+        eligible = [
+            i
+            for i, raw_name in enumerate(self.feature_names_raw)
+            if not (raw_name.startswith("cat__") and raw_values[i] == 0)
+        ]
+
+        order = sorted(eligible, key=lambda i: abs(values[i]), reverse=True)[:top_n]
+        factors = []
+        for i in order:
+            raw_name = self.feature_names_raw[i]
+            factors.append(
+                {
+                    "feature": prettify_feature_name(raw_name),
+                    "impact": float(values[i]),
+                    "direction": "increases risk" if values[i] > 0 else "decreases risk",
+                }
+            )
+        return factors
+
+
+_singleton = None
+
+
+def get_explainer() -> HeartRiskExplainer:
+    global _singleton
+    if _singleton is None:
+        _singleton = HeartRiskExplainer()
+        # Force any one-time lazy initialization (SHAP's TreeExplainer does
+        # some expensive first-call setup work) to happen right now, during
+        # startup, instead of silently during the very first real user
+        # request — which otherwise looks like the app has frozen.
+        _warmup_patient = {
+            "age": 50, "sex": 0, "cp": 0, "trestbps": 120, "chol": 200, "fbs": 0,
+            "restecg": 0, "thalach": 150, "exang": 0, "oldpeak": 0.0, "slope": 0,
+            "ca": 0, "thal": 2,
+        }
+        try:
+            _singleton.predict(_warmup_patient)
+        except Exception:
+            pass  # warm-up is best-effort; a real request will surface any genuine error
+    return _singleton

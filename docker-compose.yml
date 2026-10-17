@@ -1,0 +1,29 @@
+name: heartwise
+services:
+  api:
+    build:
+      context: .
+      target: api
+      args:
+        BUNDLE_ID: ${HEARTWISE_ARTIFACT:?Set HEARTWISE_ARTIFACT to a validated bundle ID}
+    expose: ["8000"]
+    environment:
+      HEARTWISE_MAX_BODY_BYTES: "8192"
+      HEARTWISE_REQUESTS_PER_MINUTE: "120"
+    read_only: true
+    tmpfs: [/tmp]
+    restart: unless-stopped
+  streamlit:
+    build:
+      context: .
+      target: streamlit
+    ports: ["127.0.0.1:8502:8501"]
+    environment:
+      HEARTWISE_MODE: api
+      HEARTWISE_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp, /home/heartwise/.streamlit]
+    restart: unless-stopped

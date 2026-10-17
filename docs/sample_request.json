@@ -1,0 +1,16 @@
+{
+  "age": 54,
+  "sex": 0,
+  "cp": 2,
+  "trestbps": 125,
+  "chol": 240,
+  "fbs": 0,
+  "restecg": 1,
+  "thalach": 155,
+  "exang": 0,
+  "oldpeak": 0.6,
+  "slope": 2,
+  "ca": 0,
+  "thal": 2,
+  "patient_id": "Synthetic A"
+}

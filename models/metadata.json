@@ -1,0 +1,84 @@
+{
+  "model_name": "HeartWise-RiskModel",
+  "version": "2.2.0",
+  "model_family": "XGBoost",
+  "calibration_method": "isotonic",
+  "selection_rationale": "XGBoost, with monotonic constraints on Max Heart Rate Achieved, ST Depression (Oldpeak), Major Vessels Colored by Fluoroscopy, Exercise-Induced Angina (directions measured from training-data correlations, not assumed), was preferred as the production model. Its CV rank-score (0.8502) is within 0.03 of the top performer (Logistic Regression, 0.8623), and its recall (0.778) is at least as good as the strongest alternative tree-based model, Random Forest (0.787). Unlike Random Forest \u2014 which, even after removing 7 rows of almost-certainly-placeholder missing-data codes (ca=4, thal=0), still showed small non-monotonic wiggles when we swept oldpeak and max heart rate across their range \u2014 XGBoost's constraints make that class of artifact structurally impossible, not just less likely, while keeping the same fast, exact SHAP explanations every tree-based model here gets.",
+  "monotone_constraints": {
+    "Max Heart Rate Achieved": "decreasing",
+    "ST Depression (Oldpeak)": "increasing",
+    "Major Vessels Colored by Fluoroscopy": "increasing",
+    "Exercise-Induced Angina": "increasing"
+  },
+  "training_date_utc": "2026-09-26T20:30:10.223496+00:00",
+  "dataset": {
+    "name": "UCI Heart Disease (Cleveland, processed)",
+    "n_records": 296,
+    "n_train": 236,
+    "n_test": 60,
+    "positive_rate": 0.4594594594594595
+  },
+  "features": [
+    "age",
+    "trestbps",
+    "chol",
+    "thalach",
+    "oldpeak",
+    "ca",
+    "sex",
+    "cp",
+    "fbs",
+    "restecg",
+    "exang",
+    "slope",
+    "thal"
+  ],
+  "numeric_features": [
+    "age",
+    "trestbps",
+    "chol",
+    "thalach",
+    "oldpeak",
+    "ca"
+  ],
+  "categorical_features": [
+    "sex",
+    "cp",
+    "fbs",
+    "restecg",
+    "exang",
+    "slope",
+    "thal"
+  ],
+  "feature_labels": {
+    "age": "Age",
+    "trestbps": "Resting Blood Pressure",
+    "chol": "Cholesterol",
+    "thalach": "Max Heart Rate Achieved",
+    "oldpeak": "ST Depression (Oldpeak)",
+    "ca": "Major Vessels Colored by Fluoroscopy",
+    "sex": "Sex",
+    "cp": "Chest Pain Type",
+    "fbs": "Fasting Blood Sugar > 120 mg/dl",
+    "restecg": "Resting ECG Result",
+    "exang": "Exercise-Induced Angina",
+    "slope": "Slope of Peak Exercise ST Segment",
+    "thal": "Thalassemia"
+  },
+  "metrics": {
+    "model_family": "XGBoost",
+    "calibration_method": "isotonic",
+    "test_accuracy": 0.8666666666666667,
+    "test_precision": 0.8846153846153846,
+    "test_recall": 0.8214285714285714,
+    "test_f1": 0.8518518518518519,
+    "test_roc_auc": 0.9380580357142857,
+    "brier_score": 0.10403349245243561,
+    "cv_roc_auc_mean": 0.881173493173493,
+    "cv_roc_auc_std": 0.027670873781128088,
+    "cv_recall_mean": 0.7779220779220779,
+    "cv_recall_std": 0.10721257952695162
+  },
+  "decision_threshold": 0.5,
+  "intended_use": "Educational / research decision-support demo only. Not a certified medical device and must not be used for actual clinical diagnosis."
+}

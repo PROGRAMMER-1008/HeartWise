@@ -1,0 +1,5 @@
+# Community Cloud checks the entrypoint directory before the repository root.
+# Reuse the serving versions and install shared HeartWise modules from the root.
+-r ../requirements-ui.lock
+xgboost==3.4.1
+-e .

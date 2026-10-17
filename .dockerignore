@@ -1,0 +1,17 @@
+.venv/
+.python/
+.uv-cache/
+.test*/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+**/__pycache__/
+*.egg-info/
+.git/
+docs/
+reports/
+models/
+data/
+output/
+tmp/
+tests/

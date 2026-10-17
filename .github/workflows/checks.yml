@@ -1,0 +1,26 @@
+name: HeartWise checks
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.lock && pip install --no-deps -e .
+      - run: python -m ruff check src api app scripts tests
+      - run: python -m src.audit
+      - run: python -m src.artifacts validate
+      - run: python -m pytest -q
+  containers:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "HEARTWISE_ARTIFACT=$(cat artifacts/active.txt)" >> "$GITHUB_ENV"
+      - run: docker compose up --build --wait --wait-timeout 120
+      - run: docker compose exec -T streamlit python -c "from src.client import ServingClient; from src.explain import DEMO; c=ServingClient(); assert c.predict(DEMO)['artifact_id']==c.info()['artifact_id']"
+      - if: always()
+        run: docker compose down

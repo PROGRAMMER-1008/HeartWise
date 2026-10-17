@@ -1,0 +1,24 @@
+{
+  "n_test": 60,
+  "false_negatives": 5,
+  "false_positives": 3,
+  "false_negative_rate_of_positives": 0.17857142857142858,
+  "false_positive_rate_of_negatives": 0.09375,
+  "false_negative_profile_mean": {
+    "age": 59.8,
+    "trestbps": 163.6,
+    "chol": 240.4,
+    "thalach": 153.6,
+    "oldpeak": 0.8,
+    "ca": 0.2
+  },
+  "true_positive_profile_mean": {
+    "age": 55.6,
+    "trestbps": 129.5,
+    "chol": 243.2,
+    "thalach": 133.6,
+    "oldpeak": 1.9,
+    "ca": 1.5
+  },
+  "false_negative_mean_probability": 0.313416503071785
+}

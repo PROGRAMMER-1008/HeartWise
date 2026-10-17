@@ -1,0 +1,100 @@
+{
+  "artifact_id": "hw-8f3c351bc5ead288",
+  "probability": 0.024529948343757303,
+  "prediction": 0,
+  "prediction_label": "Disease-absent class",
+  "threshold": 0.5,
+  "calibration": "sigmoid",
+  "domain_status": "within_observed_ranges",
+  "warnings": [],
+  "explanation": {
+    "status": "available",
+    "target": "hw-8f3c351bc5ead288",
+    "scale": "probability",
+    "method": "grouped raw-field permutation Shapley; 16 permutations, 8 development backgrounds, seed 42",
+    "base_value": 0.3309753963920349,
+    "contributions": [
+      {
+        "field": "ca",
+        "feature": "Major Vessels Colored by Fluoroscopy",
+        "value": "0",
+        "impact": -0.09142310854051704
+      },
+      {
+        "field": "sex",
+        "feature": "Sex",
+        "value": "Female",
+        "impact": -0.055242529816766944
+      },
+      {
+        "field": "thal",
+        "feature": "Thallium stress-test result",
+        "value": "Normal",
+        "impact": -0.04621124243260729
+      },
+      {
+        "field": "cp",
+        "feature": "Chest Pain Type",
+        "value": "Non-anginal pain",
+        "impact": -0.03854489250883019
+      },
+      {
+        "field": "slope",
+        "feature": "Slope of Peak Exercise ST Segment",
+        "value": "Upsloping",
+        "impact": -0.021532550410033376
+      },
+      {
+        "field": "thalach",
+        "feature": "Max Heart Rate Achieved",
+        "value": "155.0",
+        "impact": -0.020528114716385614
+      },
+      {
+        "field": "restecg",
+        "feature": "Resting ECG Result",
+        "value": "Normal",
+        "impact": -0.012515199455310128
+      },
+      {
+        "field": "oldpeak",
+        "feature": "ST Depression (Oldpeak)",
+        "value": "0.6",
+        "impact": -0.009206415592530139
+      },
+      {
+        "field": "trestbps",
+        "feature": "Resting Blood Pressure",
+        "value": "125.0",
+        "impact": -0.008213383961913012
+      },
+      {
+        "field": "chol",
+        "feature": "Cholesterol",
+        "value": "240.0",
+        "impact": -0.006683770614986121
+      },
+      {
+        "field": "fbs",
+        "feature": "Fasting Blood Sugar > 120 mg/dl",
+        "value": "No",
+        "impact": 0.0038256331588418895
+      },
+      {
+        "field": "age",
+        "feature": "Age",
+        "value": "54",
+        "impact": -0.00016987315723961203
+      },
+      {
+        "field": "exang",
+        "feature": "Exercise-Induced Angina",
+        "value": "No",
+        "impact": 0.0
+      }
+    ],
+    "residual": -0.05349112433952274,
+    "reconstruction_error": 2.0816681711721685e-17,
+    "note": "Finite-background permutation Shapley estimate of this model probability; associations, not causes or treatment advice. Correlated-feature combinations may be unrealistic."
+  }
+}

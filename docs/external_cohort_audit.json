@@ -1,0 +1,92 @@
+{
+  "artifact_id": "hw-8f3c351bc5ead288",
+  "source": "https://archive.ics.uci.edu/dataset/45/heart+disease",
+  "doi": "10.24432/C52P4X",
+  "license": "CC BY 4.0",
+  "retrieved_date": "2026-10-12",
+  "cohorts": {
+    "hungarian": {
+      "source_file": "processed.hungarian.data",
+      "sha256": "d1ad108f785768cd3d7e82dc522e6f5a61eea93cccfb3a46ee8076f73fc3d796",
+      "n": 294,
+      "missing_by_field": {
+        "age": 0,
+        "sex": 0,
+        "cp": 0,
+        "trestbps": 1,
+        "chol": 23,
+        "fbs": 8,
+        "restecg": 1,
+        "thalach": 1,
+        "exang": 1,
+        "oldpeak": 0,
+        "slope": 190,
+        "ca": 291,
+        "thal": 266,
+        "target": 0
+      },
+      "complete_cases": 1,
+      "valid_complete_adult_records": 1,
+      "class_counts_complete": {
+        "1": 1
+      },
+      "outcome": "UCI num > 0, same documented disease-status definition",
+      "decision": "No performance estimate: fewer than 20 valid complete records; severe specialist-field missingness makes complete-case selection unrepresentative."
+    },
+    "switzerland": {
+      "source_file": "processed.switzerland.data",
+      "sha256": "834a405ccf5b66ab4056bb77794adc8df0b7125186454c0a1d002d33c6c3b314",
+      "n": 123,
+      "missing_by_field": {
+        "age": 0,
+        "sex": 0,
+        "cp": 0,
+        "trestbps": 2,
+        "chol": 0,
+        "fbs": 75,
+        "restecg": 1,
+        "thalach": 1,
+        "exang": 1,
+        "oldpeak": 6,
+        "slope": 17,
+        "ca": 118,
+        "thal": 52,
+        "target": 0
+      },
+      "complete_cases": 0,
+      "valid_complete_adult_records": 0,
+      "class_counts_complete": {},
+      "outcome": "UCI num > 0, same documented disease-status definition",
+      "decision": "No performance estimate: fewer than 20 valid complete records; severe specialist-field missingness makes complete-case selection unrepresentative."
+    },
+    "va": {
+      "source_file": "processed.va.data",
+      "sha256": "e7c93d8d0d2acdadfa4c5e8de768e2191e7f618b952e29623f1f0d5949ff6b8f",
+      "n": 200,
+      "missing_by_field": {
+        "age": 0,
+        "sex": 0,
+        "cp": 0,
+        "trestbps": 56,
+        "chol": 7,
+        "fbs": 7,
+        "restecg": 0,
+        "thalach": 53,
+        "exang": 53,
+        "oldpeak": 56,
+        "slope": 102,
+        "ca": 198,
+        "thal": 166,
+        "target": 0
+      },
+      "complete_cases": 1,
+      "valid_complete_adult_records": 1,
+      "class_counts_complete": {
+        "1": 1
+      },
+      "outcome": "UCI num > 0, same documented disease-status definition",
+      "decision": "No performance estimate: fewer than 20 valid complete records; severe specialist-field missingness makes complete-case selection unrepresentative."
+    }
+  },
+  "limitations": "Hospital referral populations differ. No external rows used for selection, calibration or fitting. Missing specialist measurements are not replaced by invented normal values. External accuracy is unestablished."
+}

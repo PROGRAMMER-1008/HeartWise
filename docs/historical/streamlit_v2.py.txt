@@ -1,0 +1,548 @@
+"""
+app/streamlit_app.py
+---------------------
+HeartWise — the patient-facing web app (improvement note #1: turn the
+notebook into a real web app instead of "upload dataset -> run notebook ->
+see accuracy").
+
+Run with:   streamlit run app/streamlit_app.py
+
+Talks to the FastAPI backend at API_URL if it's reachable (matching the
+Streamlit/React UI -> FastAPI -> Model architecture from the improvement
+notes); if the API isn't running, it falls back to calling the model
+in-process so the app still works with just `streamlit run`.
+"""
+
+import json
+import os
+import sys
+from pathlib import Path
+
+import pandas as pd
+import requests
+import streamlit as st
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+
+from data_pipeline import CATEGORY_OPTIONS, FEATURE_LABELS, NUMERIC_RANGES, validate_patient_input  # noqa: E402
+from report import build_pdf_report  # noqa: E402
+
+API_URL = os.environ.get("HEARTWISE_API_URL", "http://localhost:8000")
+MODELS_DIR = ROOT / "models"
+FIGURES_DIR = ROOT / "reports" / "figures"
+
+st.set_page_config(page_title="HeartWise — Heart Risk Assessment", page_icon="🫀", layout="wide")
+
+
+# ---------------------------------------------------------------------------
+# Styling
+# ---------------------------------------------------------------------------
+def inject_css():
+    st.html(
+        """
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+        :root {
+            --hw-red: #C0293B;
+            --hw-red-dark: #8F1B2A;
+            --hw-red-light: #FDECEE;
+            --hw-ink: #1F2430;
+            --hw-muted: #6B7280;
+            --hw-green: #1B8A5A;
+            --hw-green-bg: #E8F6EF;
+            --hw-amber: #B8860B;
+            --hw-amber-bg: #FDF4E3;
+            --hw-blue: #2B6CB0;
+            --hw-border: #E7E5E4;
+            --hw-card: #FFFFFF;
+        }
+
+        html, body, [class*="css"] { font-family: 'Inter', -apple-system, sans-serif; }
+        h1, h2, h3, h4 { font-family: 'Poppins', 'Inter', sans-serif; }
+
+        .stApp { background: #FAFAF9; }
+        .block-container { padding-top: 1.5rem; max-width: 1200px; }
+
+        /* ---- Hero banner ---- */
+        .hw-hero {
+            background: linear-gradient(120deg, var(--hw-red) 0%, var(--hw-red-dark) 100%);
+            border-radius: 18px;
+            padding: 2.1rem 2.4rem;
+            margin-bottom: 1.6rem;
+            box-shadow: 0 8px 24px rgba(143, 27, 42, 0.25);
+            color: white;
+        }
+        .hw-hero h1 {
+            color: white; margin: 0; font-size: 2.1rem; font-weight: 800;
+            display: flex; align-items: center; gap: 0.6rem;
+        }
+        .hw-hero p {
+            color: rgba(255,255,255,0.92); margin: 0.4rem 0 0 0; font-size: 1.02rem;
+        }
+        .hw-hero .hw-badges { margin-top: 0.9rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .hw-pill {
+            display: inline-block; padding: 0.22rem 0.7rem; border-radius: 999px;
+            font-size: 0.78rem; font-weight: 600; background: rgba(255,255,255,0.18);
+            color: white; border: 1px solid rgba(255,255,255,0.35);
+        }
+
+        /* ---- Generic card ---- */
+        .hw-card {
+            background: var(--hw-card); border: 1px solid var(--hw-border);
+            border-radius: 14px; padding: 1.4rem 1.6rem; margin-bottom: 1.1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .hw-card h4 { margin-top: 0; color: var(--hw-ink); }
+
+        /* ---- Section labels ---- */
+        .hw-section-label {
+            text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.74rem;
+            font-weight: 700; color: var(--hw-muted); margin-bottom: 0.4rem;
+        }
+
+        /* ---- Risk result ---- */
+        .hw-risk-banner {
+            border-radius: 14px; padding: 1.3rem 1.6rem; margin-bottom: 1rem;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+        }
+        .hw-risk-banner.low { background: var(--hw-green-bg); border: 1px solid #BFE6D4; }
+        .hw-risk-banner.borderline { background: var(--hw-amber-bg); border: 1px solid #F0DCA0; }
+        .hw-risk-banner.elevated { background: var(--hw-red-light); border: 1px solid #F3C4CB; }
+        .hw-risk-label { font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.75; }
+        .hw-risk-value { font-family: 'Poppins', sans-serif; font-size: 1.9rem; font-weight: 800; margin-top: 0.15rem; }
+        .hw-risk-banner.low .hw-risk-value { color: var(--hw-green); }
+        .hw-risk-banner.borderline .hw-risk-value { color: var(--hw-amber); }
+        .hw-risk-banner.elevated .hw-risk-value { color: var(--hw-red-dark); }
+        .hw-risk-prob { text-align: right; }
+        .hw-risk-prob .num { font-family: 'Poppins', sans-serif; font-size: 1.7rem; font-weight: 700; color: var(--hw-ink); }
+        .hw-risk-prob .cap { font-size: 0.76rem; color: var(--hw-muted); }
+
+        .hw-bar-track { background: #E9E7E5; border-radius: 999px; height: 10px; width: 100%; overflow: hidden; margin: 0.6rem 0; }
+        .hw-bar-fill { height: 100%; border-radius: 999px; }
+        .hw-bar-fill.low { background: var(--hw-green); }
+        .hw-bar-fill.borderline { background: var(--hw-amber); }
+        .hw-bar-fill.elevated { background: var(--hw-red); }
+
+        /* ---- Factor pills ---- */
+        .hw-factor-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.55rem 0.2rem; border-bottom: 1px solid #F1F0EE;
+        }
+        .hw-factor-row:last-child { border-bottom: none; }
+        .hw-factor-name { font-size: 0.92rem; color: var(--hw-ink); font-weight: 500; }
+        .hw-tag { padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+        .hw-tag.up { background: #FCE8EA; color: var(--hw-red-dark); }
+        .hw-tag.down { background: var(--hw-green-bg); color: var(--hw-green); }
+
+        /* ---- Disclaimer ---- */
+        .hw-disclaimer {
+            background: #FFF8E1; border: 1px solid #F3E2A9; border-radius: 12px;
+            padding: 0.9rem 1.2rem; font-size: 0.88rem; color: #6B5A1E; margin: 1rem 0;
+        }
+
+        /* ---- Metric cards (dashboard) ---- */
+        div[data-testid="stMetric"] {
+            background: var(--hw-card); border: 1px solid var(--hw-border);
+            border-radius: 12px; padding: 0.9rem 1rem 0.6rem 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        div[data-testid="stMetricLabel"] { font-size: 0.78rem; color: var(--hw-muted); }
+        div[data-testid="stMetricValue"] { color: var(--hw-red-dark); font-family: 'Poppins', sans-serif; }
+
+        /* ---- Tabs ---- */
+        .stTabs [data-baseweb="tab-list"] { gap: 6px; }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 10px 10px 0 0; padding: 0.5rem 1.1rem; font-weight: 600;
+        }
+        .stTabs [aria-selected="true"] { color: var(--hw-red-dark) !important; }
+
+        /* ---- Buttons ---- */
+        .stButton>button, .stDownloadButton>button, .stFormSubmitButton>button {
+            background: linear-gradient(120deg, var(--hw-red) 0%, var(--hw-red-dark) 100%);
+            color: white; border: none; border-radius: 10px; font-weight: 600;
+            padding: 0.6rem 1.2rem; box-shadow: 0 2px 8px rgba(192, 41, 59, 0.28);
+        }
+        .stButton>button:hover, .stDownloadButton>button:hover, .stFormSubmitButton>button:hover {
+            filter: brightness(1.08); color: white;
+        }
+
+        /* ---- Form section headers ---- */
+        .hw-form-group-label {
+            font-weight: 700; color: var(--hw-red-dark); font-size: 0.85rem;
+            text-transform: uppercase; letter-spacing: 0.04em; margin: 0.2rem 0 0.6rem 0;
+        }
+        </style>
+        """
+    )
+
+
+def risk_css_class(risk_level: str) -> str:
+    return {"Low": "low", "Borderline": "borderline", "Elevated": "elevated"}.get(risk_level, "low")
+
+
+inject_css()
+
+
+# ---------------------------------------------------------------------------
+# Model loading (in-process fallback path)
+# ---------------------------------------------------------------------------
+@st.cache_resource
+def load_local_explainer():
+    from explain import get_explainer
+
+    return get_explainer()
+
+
+@st.cache_data
+def load_metadata():
+    with open(MODELS_DIR / "metadata.json") as f:
+        return json.load(f)
+
+
+def api_is_up() -> bool:
+    try:
+        r = requests.get(f"{API_URL}/health", timeout=1.0)
+        return r.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def run_prediction(patient: dict) -> dict:
+    """Try the FastAPI backend first; fall back to the in-process model."""
+    if api_is_up():
+        try:
+            r = requests.post(f"{API_URL}/predict", json=patient, timeout=5.0)
+            r.raise_for_status()
+            return r.json(), "api"
+        except requests.RequestException:
+            pass
+    explainer = load_local_explainer()
+    result = explainer.predict(patient)
+    metadata = load_metadata()
+    result["model_version"] = metadata["version"]
+    return result, "local"
+
+
+# ---------------------------------------------------------------------------
+# Hero
+# ---------------------------------------------------------------------------
+metadata_preview = load_metadata()
+
+# Warm the local model + SHAP explainer once, right now, rather than letting
+# it happen silently during someone's first "Assess Risk" click — that
+# first-call cost (SHAP's TreeExplainer does one-time setup work) can take
+# far longer than a normal prediction and otherwise looks like a freeze.
+if "hw_warmed_up" not in st.session_state:
+    with st.spinner("Preparing model..."):
+        load_local_explainer()
+    st.session_state["hw_warmed_up"] = True
+st.html(
+    f"""
+    <div class="hw-hero">
+        <h1>🫀 HeartWise</h1>
+        <p>AI-assisted heart disease risk screening — explainable, validated, and honest about its limits.</p>
+        <div class="hw-badges">
+            <span class="hw-pill">Model: {metadata_preview['model_family']}</span>
+            <span class="hw-pill">v{metadata_preview['version']}</span>
+            <span class="hw-pill">ROC-AUC {metadata_preview['metrics']['test_roc_auc']:.2f}</span>
+            <span class="hw-pill">Educational / research use only</span>
+        </div>
+    </div>
+    """
+)
+
+tab_predict, tab_dashboard, tab_about = st.tabs(["🔍  Risk Assessment", "📊  Model Dashboard", "ℹ️  About & Responsible Use"])
+
+# ---------------------------------------------------------------------------
+# TAB 1 — Predict
+# ---------------------------------------------------------------------------
+with tab_predict:
+    st.html('<div class="hw-card">')
+    st.html('<div class="hw-section-label">Step 1</div>')
+    st.subheader("Patient Information")
+    with st.form("patient_form"):
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.html('<div class="hw-form-group-label">Identity & Vitals</div>')
+            patient_id = st.text_input("Patient ID (optional)", value="HR-2026-001")
+            age_lo, age_hi, age_step = NUMERIC_RANGES["age"]
+            age = st.number_input(FEATURE_LABELS["age"], min_value=int(age_lo), max_value=int(age_hi), value=55, step=1)
+            sex = st.selectbox(FEATURE_LABELS["sex"], options=list(CATEGORY_OPTIONS["sex"].keys()), format_func=lambda k: CATEGORY_OPTIONS["sex"][k])
+            cp = st.selectbox(FEATURE_LABELS["cp"], options=list(CATEGORY_OPTIONS["cp"].keys()), format_func=lambda k: CATEGORY_OPTIONS["cp"][k])
+            bp_lo, bp_hi, bp_step = NUMERIC_RANGES["trestbps"]
+            trestbps = st.number_input(FEATURE_LABELS["trestbps"] + " (mmHg)", min_value=float(bp_lo), max_value=float(bp_hi), value=130.0, step=1.0)
+
+        with col2:
+            st.html('<div class="hw-form-group-label">Labs & ECG</div>')
+            chol_lo, chol_hi, chol_step = NUMERIC_RANGES["chol"]
+            chol = st.number_input(FEATURE_LABELS["chol"] + " (mg/dl)", min_value=float(chol_lo), max_value=float(chol_hi), value=230.0, step=1.0)
+            fbs = st.selectbox(FEATURE_LABELS["fbs"], options=list(CATEGORY_OPTIONS["fbs"].keys()), format_func=lambda k: CATEGORY_OPTIONS["fbs"][k])
+            restecg = st.selectbox(FEATURE_LABELS["restecg"], options=list(CATEGORY_OPTIONS["restecg"].keys()), format_func=lambda k: CATEGORY_OPTIONS["restecg"][k])
+            hr_lo, hr_hi, hr_step = NUMERIC_RANGES["thalach"]
+            thalach = st.number_input(FEATURE_LABELS["thalach"], min_value=float(hr_lo), max_value=float(hr_hi), value=150.0, step=1.0)
+
+        with col3:
+            st.html('<div class="hw-form-group-label">Exercise Test</div>')
+            exang = st.selectbox(FEATURE_LABELS["exang"], options=list(CATEGORY_OPTIONS["exang"].keys()), format_func=lambda k: CATEGORY_OPTIONS["exang"][k])
+            op_lo, op_hi, op_step = NUMERIC_RANGES["oldpeak"]
+            oldpeak = st.number_input(FEATURE_LABELS["oldpeak"], min_value=float(op_lo), max_value=float(op_hi), value=1.0, step=0.1)
+            slope = st.selectbox(FEATURE_LABELS["slope"], options=list(CATEGORY_OPTIONS["slope"].keys()), format_func=lambda k: CATEGORY_OPTIONS["slope"][k])
+            ca_lo, ca_hi, ca_step = NUMERIC_RANGES["ca"]
+            ca = st.number_input(FEATURE_LABELS["ca"], min_value=int(ca_lo), max_value=int(ca_hi), value=0, step=1)
+            thal = st.selectbox(FEATURE_LABELS["thal"], options=list(CATEGORY_OPTIONS["thal"].keys()), format_func=lambda k: CATEGORY_OPTIONS["thal"][k])
+
+        submitted = st.form_submit_button("🔍  Assess Risk", type="primary", use_container_width=True)
+    st.html("</div>")
+
+    if submitted:
+        patient = {
+            "age": int(age), "sex": int(sex), "cp": int(cp), "trestbps": float(trestbps),
+            "chol": float(chol), "fbs": int(fbs), "restecg": int(restecg), "thalach": float(thalach),
+            "exang": int(exang), "oldpeak": float(oldpeak), "slope": int(slope), "ca": int(ca),
+            "thal": int(thal), "patient_id": patient_id or "N/A",
+        }
+
+        # Point 9: data validation, checked again server-side regardless of
+        # the widget bounds above (defense in depth).
+        errors = validate_patient_input(patient)
+        if errors:
+            for e in errors:
+                st.error(f"**{e.field}**: {e.message}")
+        else:
+            with st.spinner("Scoring patient..."):
+                result, source = run_prediction(patient)
+
+            risk_level = result["risk_level"]
+            css_class = risk_css_class(risk_level)
+            pct = min(max(result["probability"], 0.0), 1.0) * 100
+
+            res_col1, res_col2 = st.columns([1, 1.3], gap="medium")
+            with res_col1:
+                st.html(
+                    f"""
+                    <div class="hw-risk-banner {css_class}">
+                        <div>
+                            <div class="hw-risk-label">{risk_level} risk band</div>
+                            <div class="hw-risk-value">{result['prediction_label']}</div>
+                        </div>
+                        <div class="hw-risk-prob">
+                            <div class="num">{pct:.0f}%</div>
+                            <div class="cap">model probability</div>
+                        </div>
+                    </div>
+                    """
+                )
+                st.html(
+                    f"""
+                    <div class="hw-bar-track"><div class="hw-bar-fill {css_class}" style="width:{pct:.0f}%;"></div></div>
+                    """
+                )
+                st.caption(
+                    "This is the model's raw output score, not a clinically validated "
+                    "probability of disease — see the Dashboard tab's calibration note."
+                )
+                st.caption(f"Served by: {'FastAPI backend' if source == 'api' else 'local model (API not running)'}")
+
+            with res_col2:
+                st.html('<div class="hw-card">')
+                st.markdown("**Why the model reached this result**")
+                factors = result.get("top_factors", [])
+                if factors:
+                    rows_html = ""
+                    for f in factors:
+                        tag_class = "up" if f["direction"] == "increases risk" else "down"
+                        arrow = "▲" if tag_class == "up" else "▼"
+                        rows_html += (
+                            f'<div class="hw-factor-row">'
+                            f'<span class="hw-factor-name">{f["feature"]}</span>'
+                            f'<span class="hw-tag {tag_class}">{arrow} {f["direction"]}</span>'
+                            f"</div>"
+                        )
+                    st.html(rows_html)
+                else:
+                    st.info("Per-patient explanation isn't available for this model family.")
+                st.html("</div>")
+
+            st.html(
+                '<div class="hw-disclaimer">⚠️ <strong>This tool is for educational/research '
+                "purposes and is not a medical diagnosis.</strong> Please consult a qualified "
+                "clinician for any real health concern.</div>"
+            )
+
+            pdf_bytes = build_pdf_report(patient, result, result.get("model_version", "N/A"))
+            st.download_button(
+                "⬇️  Download Patient Risk Report (PDF)",
+                data=pdf_bytes,
+                file_name=f"heartwise_report_{patient['patient_id']}.pdf",
+                mime="application/pdf",
+            )
+
+# ---------------------------------------------------------------------------
+# TAB 2 — Dashboard
+# ---------------------------------------------------------------------------
+with tab_dashboard:
+    metadata = load_metadata()
+    metrics = metadata["metrics"]
+
+    st.subheader("Model Performance")
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Accuracy", f"{metrics['test_accuracy']:.1%}")
+    m2.metric("Precision", f"{metrics['test_precision']:.1%}")
+    m3.metric("Recall", f"{metrics['test_recall']:.1%}")
+    m4.metric("F1 Score", f"{metrics['test_f1']:.1%}")
+    m5.metric("ROC-AUC", f"{metrics['test_roc_auc']:.3f}")
+    st.caption(
+        f"Model: **{metadata['model_family']}** (v{metadata['version']}) · "
+        f"Cross-validated ROC-AUC: {metrics['cv_roc_auc_mean']:.3f} ± {metrics['cv_roc_auc_std']:.3f} "
+        f"(Stratified 5-Fold) · Trained on {metadata['dataset']['n_records']} patients "
+        f"({metadata['dataset']['n_train']} train / {metadata['dataset']['n_test']} test)."
+    )
+    with st.expander("Why this model was chosen over the other 5"):
+        st.write(metadata.get("selection_rationale", "N/A"))
+        if metadata.get("monotone_constraints"):
+            st.markdown("**Monotonic constraints applied (data-driven, not assumed):**")
+            for feat, direction in metadata["monotone_constraints"].items():
+                arrow = "📈" if direction == "increasing" else "📉"
+                st.write(f"{arrow} {feat} — constrained **{direction}**")
+        try:
+            comparison = pd.read_csv(ROOT / "reports" / "model_comparison.csv")
+            st.dataframe(
+                comparison[
+                    ["model", "roc_auc_mean", "roc_auc_std", "recall_mean", "f1_mean", "test_accuracy", "test_roc_auc"]
+                ].round(3),
+                hide_index=True,
+                use_container_width=True,
+            )
+        except FileNotFoundError:
+            st.caption("Run `python src/train.py` to generate the full comparison table.")
+
+    st.divider()
+    st.subheader("Visualizations")
+    v1, v2 = st.columns(2)
+    with v1:
+        st.image(str(FIGURES_DIR / "confusion_matrix.png"), use_container_width=True)
+        st.image(str(FIGURES_DIR / "feature_importance.png"), use_container_width=True)
+        st.image(str(FIGURES_DIR / "class_distribution.png"), use_container_width=True)
+    with v2:
+        st.image(str(FIGURES_DIR / "roc_curves.png"), use_container_width=True)
+        st.image(str(FIGURES_DIR / "shap_summary.png"), use_container_width=True)
+        st.image(str(FIGURES_DIR / "calibration_curve.png"), use_container_width=True)
+        cal_note = (
+            f"This model's calibration was checked against two standard methods (Platt/sigmoid "
+            f"and isotonic). Best method found: **{metadata['calibration_method']}** "
+            f"(Brier = {metrics['brier_score']:.4f}). If 'none' was best, the raw probabilities "
+            "are used as-is because neither method improved on them at this dataset size."
+        )
+        st.caption(cal_note)
+
+    st.divider()
+    st.subheader("Data Quality Notes")
+    st.html(
+        f"""
+        <div class="hw-card">
+        <ul>
+        <li><strong>Outcome label was inverted and has been corrected.</strong> The commonly-mirrored
+        copy of this dataset has its disease label backwards — confirmed against well-established
+        clinical markers (ST depression, max heart rate, exercise angina, chest pain type) that were
+        all reversed under the raw label and became clinically coherent once corrected. This is the
+        root cause of feature effects that previously looked illogical (e.g. cholesterol/ST depression
+        barely affecting the score, "Normal" thalassemia scoring above "Fixed defect").</li>
+        <li><strong>7 rows dropped</strong> before training —
+        <code>ca=4</code> and <code>thal=0</code> appear in only 5 and 2 patients respectively out of 303,
+        far too few to learn anything real, and almost certainly leftover "missing data" placeholder codes
+        from the original UCI collection rather than genuine clinical values.</li>
+        <li><strong>Monotonic constraints</strong> are applied to the features listed above so that, for
+        example, increasing ST depression can never <em>decrease</em> predicted risk due to small-sample
+        noise — the direction is measured from this dataset's actual (corrected) training-set
+        correlations, not assumed from textbook intuition.</li>
+        <li><strong>Input ranges were tightened</strong> to match what the model actually saw in training
+        (e.g. cholesterol up to 605, not 700) — tree-based models can't extrapolate past the highest value
+        they ever split on, so predictions go flat well beyond the training range regardless of how
+        sensible the feature's overall relationship is.</li>
+        </ul>
+        </div>
+        """
+    )
+
+    st.divider()
+    st.subheader("Error Analysis")
+    try:
+        with open(ROOT / "reports" / "error_analysis.json") as f:
+            err = json.load(f)
+        e1, e2 = st.columns(2)
+        e1.metric("False negatives (missed disease)", err["false_negatives"])
+        e2.metric("False positives (false alarms)", err["false_positives"])
+        st.caption(
+            f"Of {err['n_test']} test patients: "
+            f"{err['false_negative_rate_of_positives']:.1%} of actual positive cases were missed, "
+            f"{err['false_positive_rate_of_negatives']:.1%} of actual negative cases were flagged. "
+            "In a screening context, false negatives are the costlier error — a missed case gets no "
+            "follow-up — so recall is weighted accordingly in model selection (see rationale above)."
+        )
+        if "false_negative_profile_mean" in err:
+            st.write("**Average profile of missed (false-negative) patients vs. correctly caught positives:**")
+            profile_df = pd.DataFrame(
+                {
+                    "False negatives (missed)": err["false_negative_profile_mean"],
+                    "True positives (caught)": err["true_positive_profile_mean"],
+                }
+            )
+            profile_df.index = [FEATURE_LABELS.get(i, i) for i in profile_df.index]
+            st.dataframe(profile_df, use_container_width=True)
+    except FileNotFoundError:
+        st.caption("Run `python src/train.py` to generate the error analysis.")
+
+# ---------------------------------------------------------------------------
+# TAB 3 — About & Responsible Use
+# ---------------------------------------------------------------------------
+with tab_about:
+    metadata = load_metadata()
+    st.subheader("About HeartWise")
+    st.write(
+        "HeartWise is a decision-support demo that estimates heart disease risk from standard "
+        "clinical intake fields (age, chest pain type, blood pressure, cholesterol, ECG results, "
+        "and related exercise-test measurements) and explains *why* it reached that estimate, "
+        "using SHAP to attribute the prediction to specific patient factors."
+    )
+
+    st.subheader("⚠️ Responsible AI — please read")
+    st.markdown(
+        """
+- **Not a diagnosis.** This tool estimates statistical risk from a research dataset. It has not
+  been clinically validated and must never replace professional medical judgment.
+- **Dataset limitations.** The model is trained on the classic UCI Cleveland heart-disease dataset
+  (~300 patients, collected at one hospital in the 1980s). It may not generalize to other
+  populations, demographics, or eras of clinical practice.
+- **A labeling bug was found and fixed in this version.** The public copy of this dataset most
+  commonly redistributed online has its outcome label inverted relative to actual disease status —
+  confirmed by checking it against well-established clinical markers (ST depression, max heart
+  rate, exercise-induced angina, chest pain type) that all came out backwards under the raw label
+  and became clinically coherent once corrected. Earlier versions of this model were trained on the
+  uncorrected label, which is why some feature effects looked illogical (e.g. cholesterol or ST
+  depression barely moving the risk score, or "Normal" thalassemia scoring above "Fixed defect").
+- **Calibration.** The displayed number is a *model output score*; see the Dashboard tab for what
+  calibration testing found for this specific model.
+- **False negatives matter.** No screening model is perfect; see the Dashboard's error analysis for
+  how often — and for which kinds of patients — this model misses a true positive case.
+        """
+    )
+
+    st.subheader("Model Versioning")
+    st.json(
+        {
+            "model_name": metadata["model_name"],
+            "version": metadata["version"],
+            "model_family": metadata["model_family"],
+            "calibration_method": metadata["calibration_method"],
+            "monotone_constraints": metadata.get("monotone_constraints", {}),
+            "training_date_utc": metadata["training_date_utc"],
+            "dataset": metadata["dataset"],
+            "features": metadata["features"],
+        }
+    )
+
+    st.caption("Dataset: UCI Machine Learning Repository — Heart Disease (Cleveland). "
+               "Janosi, Steinbrunn, Pfisterer & Detrano (1988). CC BY 4.0.")

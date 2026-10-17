@@ -1,0 +1,3 @@
+# Preserve exact bytes used by model manifests and source-data fingerprints.
+artifacts/** -text
+data/** -text
